@@ -6,6 +6,7 @@ html {
   --bg: #f4f4f4;
   --fg: #25282A;
   --gray: #888;
+  --darkGray: rgb(97, 97, 97);
   --royal: #0072CE;
   --blue: #6AD1E3;
   --primary: #93b0df;
@@ -170,9 +171,69 @@ table button {
 }
 
 .gray-tile {
-  background-color: #CFD2CF;
+  background-color: #727272;
 }
 
 .orange-tile {
   background-color: #FD841F;
+}
+
+
+.red-tile {
+  background-color: #fe5a4b;
+}
+
+.tabs-container {
+  width: 100%;
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  gap: 2px;
+}
+
+
+.tab-header {
+  padding: 16px;
+  cursor: pointer;
+  text-align: center;
+  flex-grow: 1;
+}
+
+.tab-selected {
+  border-bottom: 4px solid var(--blue);
+  background-color: var(--darkGray);
+}
+
+.tab-content {
+  margin-top: 16px;
+}
+
+
+
+.wordle-list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.wordle-list-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.badge {
+  border-radius: 8px;
+  padding: 8px;
+}
+
+.wordle-list-item {
+  background-color: #414141;
+  border-radius: 8px;
+  padding: 8px;
+  margin-bottom: 8px;
+  display: flex;
+  justify-content: space-evenly;
+  align-items: center;
 }

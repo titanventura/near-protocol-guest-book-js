@@ -27,4 +27,29 @@ export class WordleInterface {
         })
     }
 
+    async submitGuess(wordle_id, guess) {
+        console.log(wordle_id, guess)
+        return await this.wallet.callMethod({
+            contractId: this.contractId,
+            method: "wordleAttempt",
+            args: {
+                id: wordle_id,
+                attempt: guess
+            }
+        })
+    }
+
+    async existingWordle() {
+        return await this.wallet.callMethod({
+            contractId: this.contractId,
+            method: "existingWordle",
+        })
+    }
+
+    async allWordlesByUser() {
+        return await this.wallet.callMethod({
+            contractId: this.contractId,
+            method: "allWordlesByUser",
+        })
+    }
 }

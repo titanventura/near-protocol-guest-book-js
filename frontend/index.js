@@ -1,7 +1,6 @@
 // React
 import React from 'react';
-import ReactDOM from 'react-dom';
-import Wordle from './Wordle';
+import App from './App';
 import { createRoot } from 'react-dom/client';
 
 // NEAR
@@ -29,6 +28,6 @@ window.onload = async () => {
 
   root.render(
     // <App isSignedIn={isSignedIn} guestBook={guestBook} wallet={wallet} />,
-    <Wordle isSignedIn={isSignedIn} wordleInterface={wordleInterface} wallet={wallet} />
+    <App isSignedIn={isSignedIn} wordleInterface={wordleInterface} wallet={wallet} />
   );
 }

@@ -2,31 +2,11 @@ import {
 	call,
 	near,
 	NearBindgen,
+	NearPromise,
 	view,
 } from "near-sdk-js"
 import { blockTimestamp } from "near-sdk-js/lib/api";
 import { Correctness, GameStatus } from "./model"
-
-// const POINT_ONE = BigInt("100000000000000000000000")
-
-function makeid(length: Number): string {
-	var result = '';
-	var characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-	var charactersLength = characters.length;
-	for (var i = 0; i < length; i++) {
-		result += characters.charAt(Math.floor(Math.random() * charactersLength));
-	}
-	return result;
-}
-
-function randomId(): string {
-	return makeid(16)
-}
-
-function getRandomKey(obj: {}): string {
-	let keys = Object.keys(obj);
-	return keys[Math.floor(Math.random() * keys.length)];
-}
 
 type WordleID = string
 type UserID = string
@@ -50,31 +30,47 @@ type Game = {
 
 type Games = Record<WordleID, Game>
 
-type ChallengesReceived = Record<WordleID, {
-	stake: Number
-	fromUser: UserID
-	createdAt: string
-}>
 
-type ChallengesSent = Record<WordleID, {
-	stake: Number
-	toUser: UserID,
+enum ChallengeStatus {
+	PENDING = 0,
+	ACCEPTED = 1,
+	REJECTED = 2
+}
+
+type ChallengeSent = {
+	index: string
+	toIndex: string
+	to: UserID
+	stake: string
+	wordleId: WordleID
+	status: ChallengeStatus
 	createdAt: string
-}>
+}
+
+type ChallengeReceived = {
+	index: string
+	fromIndex: string
+	from: UserID
+	stake: string
+	wordleId: WordleID
+	status: ChallengeStatus
+	createdAt: string
+}
 
 type UserData = {
 	games: Games,
-	challenges_received: ChallengesReceived,
-	challenges_sent: ChallengesSent
+	challenges_received: ChallengeReceived[],
+	challenges_sent: ChallengeSent[]
 }
 
 @NearBindgen({})
 class WordleContract {
-	wordles: Record<WordleID, string> = {}
+	wordles = []
 	userData: Record<UserID, UserData> = {}
 
+
 	private wordleExists(word: string) {
-		return Object.values(this.wordles).includes(word)
+		return this.wordles.includes(word)
 	}
 
 	private validWordle(word: string) {
@@ -99,9 +95,59 @@ class WordleContract {
 			return { msg: "Wordle exists", success: false }
 		}
 
-		this.wordles[randomId()] = wordle
+		this.wordles.push(wordle)
 		near.log(`new wordle set ! at ${Date.now()}`)
 		return { msg: `wordle ${wordle} set`, success: true }
+	}
+
+	@view({})
+	existingWordle(): { wordle_id: string | null, game: Game | null } {
+		let user = near.predecessorAccountId()
+
+		// Check if user is new
+		if (!this.userData.hasOwnProperty(user)) {
+			return {
+				wordle_id: null,
+				game: null
+			}
+		}
+
+		let gamesPlayedByUser = this.userData[user].games
+
+		let wordleAndGame = Object
+			.entries(gamesPlayedByUser)
+			.find(([wordleId, game]) => {
+				return game.status == GameStatus.IN_PROGRESS
+			})
+
+		if (wordleAndGame === undefined) {
+			return {
+				wordle_id: null,
+				game: null
+			}
+		}
+		let [wordleId, game] = wordleAndGame
+		return {
+			wordle_id: wordleId,
+			game
+		}
+	}
+
+	@view({})
+	getGameById({ id }: { id: string }): Game {
+		let userid = near.predecessorAccountId()
+		if (!this.userData.hasOwnProperty(userid)) {
+			return null
+		}
+		let user = this.userData[userid]
+		return user.games[id]
+	}
+
+	@view({})
+	allWordlesByUser(): Games {
+		const user = near.predecessorAccountId()
+		const games = this.userData[user].games
+		return games
 	}
 
 	@call({ payableFunction: true })
@@ -116,8 +162,8 @@ class WordleContract {
 		if (!this.userData.hasOwnProperty(userID)) {
 			this.userData[userID] = {
 				games: {},
-				challenges_received: {},
-				challenges_sent: {}
+				challenges_received: [],
+				challenges_sent: []
 			}
 		}
 
@@ -150,11 +196,10 @@ class WordleContract {
 				success: false
 			}
 		}
+
 		// try to get a unique wordle that the user hasn't solved
-		let randomWordleID = getRandomKey(this.wordles)
-		while (involvedWordleIDs.has(randomWordleID)) {
-			randomWordleID = getRandomKey(this.wordles)
-		}
+		let randomWordleID = Array.from(Array(this.wordles.length).keys())
+			.filter(w => !Array.from(involvedWordleIDs).includes(w.toString()))[0]
 
 		let now = blockTimestamp().toString()
 		let game: Game = {
@@ -166,8 +211,130 @@ class WordleContract {
 		games[randomWordleID] = game
 		return {
 			msg: "new game created",
-			wordle_id: randomWordleID,
+			wordle_id: randomWordleID.toString(),
 			game,
+			success: true
+		}
+	}
+
+	@view({})
+	checkIfChallengeEligible({ wordle_id, user_id }: { wordle_id: string, user_id: string }): { eligibile: boolean } {
+		let userPlayedGames = this.userData[user_id].games
+		return {
+			eligibile: !Object.keys(userPlayedGames).includes(wordle_id)
+		}
+	}
+
+	@call({ payableFunction: true })
+	challengeUser({ wordle_id, user_id }: { wordle_id: string, user_id: string }): { msg: string, success: boolean } {
+
+		let selfId = near.predecessorAccountId()
+
+		if (!this.userData.hasOwnProperty(selfId)) {
+			return {
+				msg: "You should solve wordle to make a challenge",
+				success: false
+			}
+		}
+
+		let self = this.userData[selfId]
+
+		if (!Object.keys(self.games).includes(wordle_id)) {
+			return {
+				msg: "Only solved wordles are eligible to be raised for challenge",
+				success: false
+			}
+		}
+
+		if (self.challenges_sent.filter(chal => chal.wordleId == wordle_id && chal.to == user_id).length > 0) {
+			return {
+				msg: "Already challenged the user for same wordle",
+				success: false
+			}
+		}
+
+		if (!this.userData.hasOwnProperty(user_id)) {
+			this.userData[user_id] = {
+				games: {},
+				challenges_received: [],
+				challenges_sent: []
+			}
+		}
+
+		let receiver = this.userData[user_id]
+
+		const stake = near.attachedDeposit().toString()
+		const now = blockTimestamp().toString()
+		const challengeSent: ChallengeSent = {
+			stake,
+			to: user_id,
+			index: self.challenges_sent.length.toString(),
+			toIndex: receiver.challenges_received.length.toString(),
+			status: ChallengeStatus.PENDING,
+			wordleId: wordle_id,
+			createdAt: now
+		}
+		const challengeReceived: ChallengeReceived = {
+			stake,
+			fromIndex: challengeSent.index,
+			index: challengeSent.toIndex,
+			status: ChallengeStatus.PENDING,
+			from: selfId,
+			wordleId: wordle_id,
+			createdAt: now
+		}
+
+		self.challenges_sent.push(challengeSent)
+		receiver.challenges_received.push(challengeReceived)
+		return { msg: "Challenge created", success: true }
+	}
+
+	@view({})
+	challengesSent(): ChallengeSent[] {
+		let curUser = near.predecessorAccountId()
+		if (!this.userData.hasOwnProperty(curUser)) {
+			return []
+		}
+
+		return this.userData[curUser].challenges_sent
+	}
+
+	@view({})
+	challengesReceived(): ChallengeSent[] {
+		let curUser = near.predecessorAccountId()
+		if (!this.userData.hasOwnProperty(curUser)) {
+			return []
+		}
+
+		return this.userData[curUser].challenges_sent
+	}
+
+	@call({ payableFunction: true })
+	decideChallenge({ received_challenge_index, decision }: {
+		received_challenge_index: string,
+		decision: ChallengeStatus.ACCEPTED | ChallengeStatus.REJECTED
+	}): {
+		msg: string,
+		success: boolean
+	} {
+		let user = near.predecessorAccountId()
+		let self = this.userData[user]
+
+		let receivedChallenge = self.challenges_received[parseInt(received_challenge_index)]
+		let sentChallenge = this.userData[receivedChallenge.from].challenges_sent[parseInt(receivedChallenge.fromIndex)]
+		if (decision == ChallengeStatus.ACCEPTED) {
+			if (near.attachedDeposit() < BigInt(receivedChallenge.stake)) {
+				return {
+					msg: "Error. stake is less",
+					success: false
+				}
+			}
+		}
+
+		receivedChallenge.status = decision
+		sentChallenge.status = decision
+		return {
+			msg: "Challenge decision recorded",
 			success: true
 		}
 	}
@@ -226,11 +393,30 @@ class WordleContract {
 
 		if (gameAttempt.every(lc => lc.correctness == Correctness.CORRECT)) {
 			currentGame.status = GameStatus.WON
+
+
 			// TODO: see what to do with the challenge if any
+			let challengesReceived = this.userData[userID].challenges_received
+			let challengeExists = challengesReceived
+				.filter(chal => chal.wordleId == id && chal.status == ChallengeStatus.ACCEPTED)
+			if (challengeExists.length > 0) {
+				let stake = BigInt(challengeExists[0].stake)
+				stake += stake
+				NearPromise.new(userID).transfer(stake)
+			}
 		} else {
 			if (currentGame.attempts.length == 5) {
 				currentGame.status = GameStatus.LOST
+
 				// TODO: see what to do with the challenge if any
+				let challengesReceived = this.userData[userID].challenges_received
+				let challengeExists = challengesReceived
+					.filter(chal => chal.wordleId == id && chal.status == ChallengeStatus.ACCEPTED)
+				if (challengeExists.length > 0) {
+					let stake = BigInt(challengeExists[0].stake)
+					stake += stake
+					NearPromise.new(challengeExists[0].from).transfer(stake)
+				}
 			}
 		}
 		currentGame.updatedAt = blockTimestamp().toString()
@@ -242,13 +428,13 @@ class WordleContract {
 		}
 	}
 
-	@call({})
+	@call({ privateFunction: true })
 	deleteAllData() {
-		this.wordles = {}
+		this.wordles = []
 		this.userData = {}
 	}
 
-	@view({})
+	@call({ privateFunction: true })
 	allWordles() {
 		return {
 			wordles: this.wordles,

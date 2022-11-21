@@ -1,76 +1,66 @@
 import React, { useEffect, useState } from "react";
+import { toast } from "react-toastify";
 
 
-const LETTER_DOES_NOT_EXIST = 0
-const LETTER_WRONG_POS = 1
-const LETTER_CORRECT = 2
-const LETTER_INPUT = -1
+// letter correctness
+export const LETTER_DOES_NOT_EXIST = 0
+export const LETTER_WRONG_POS = 1
+export const LETTER_CORRECT = 2
+export const LETTER_INPUT = -1
 
-const styleMap = {
+export const styleMap = {
     [LETTER_CORRECT]: "green-tile",
     [LETTER_DOES_NOT_EXIST]: "gray-tile",
     [LETTER_WRONG_POS]: "orange-tile",
     [LETTER_INPUT]: "transparent-tile"
 }
 
+// game status
+export const IN_PROGRESS = 0
+export const WON = 1
+export const LOST = 2
 
-export default function Game({ wordleId, gameInfo }) {
+
+export default function Game({ wordleId, gameInfo, submitGuess, clearGame }) {
 
     if (gameInfo == null) {
         return <></>
     }
 
-    const [curWord, setCurWord] = useState([])
-    const emptyWord = { letter: "", correctness: LETTER_INPUT }
-
-    const fillWord = (word) => {
-        // console.log(word.length)
-        if (word.length == 5) {
-            return word
-        }
-        return [...word, ...Array(5 - word.length).fill(emptyWord)]
-    }
-
-
-    useEffect(() => {
-        const handleKeyDown = (e) => {
-            let curKey = e.key.toUpperCase()
-            if (/^[A-Z]$/.test(curKey)) {
-                if (curWord.length < 5) {
-                    setCurWord(word => {
-                        return [...word, { letter: curKey, correctness: LETTER_INPUT }]
-                    })
-                }
-            } else if (curKey == "BACKSPACE") {
-                if (curWord.length > 0) {
-                    setCurWord(word => {
-                        return [...word].slice(0, word.length - 1)
-                    })
-                }
-            }
-        }
-
-        window.addEventListener("keydown", handleKeyDown)
-
-        return () => window.removeEventListener("keydown", handleKeyDown)
-    }, [curWord])
+    const [curWord, setCurWord] = useState("")
 
     let freeRows = []
     if (gameInfo.attempts.length < 5) {
         freeRows = Array(5 - (gameInfo.attempts.length)).fill(
-            Array(5).fill(emptyWord)
+            Array(5).fill({ letter: "", correctness: LETTER_INPUT })
         )
     }
 
-    return <>
-        <h6>Wordle ID : {wordleId}</h6>
-        <h6>Game Info : {JSON.stringify(gameInfo, null, 4)}</h6>
+    const guessWordle = async () => {
+        console.log(`Submitting.. ${curWord}`)
+        let regex = /^[A-Z]{5}$/
+        let word = curWord.toUpperCase()
+        if (!regex.test(word)) {
+            toast.error("Word should contain only characters and should be 5 letters !", {
+                position: toast.POSITION.TOP_RIGHT,
+                autoClose: 1000
+            });
+        } else {
+            await submitGuess(curWord)
+        }
 
+    }
+
+    return <>
+        {/* <h6>Wordle ID : {wordleId}</h6>
+        <h6>Game Info : {JSON.stringify(gameInfo, null, 4)}</h6> */}
+        <a onClick={clearGame} style={{ cursor: "pointer" }}>
+            {"👈 Back"}
+        </a>
         <div className="game-container">
             {
                 [
                     ...gameInfo.attempts,
-                    fillWord(curWord),
                     ...freeRows
                 ].map((attempt, rowIdx) => {
                     return (
@@ -90,7 +80,25 @@ export default function Game({ wordleId, gameInfo }) {
                     )
                 })
             }
-            {/* <input style={{ border: "2px solid #CFD2CF", padding: "8px", marginTop: "24px" }} placeholder="Input.." type="text" name="guess-input" id="guess-input" /> */}
+
+            {
+                gameInfo.status == IN_PROGRESS &&
+                (
+                    <>
+                        <input
+                            style={{ border: "2px solid #CFD2CF", padding: "8px", marginTop: "24px" }}
+                            placeholder="Input.."
+                            type="text"
+                            onChange={(e) => setCurWord(e.target.value)}
+                            value={curWord}
+                            name="guess-input"
+                            id="guess-input" />
+
+                        <button onClick={guessWordle}>Go</button>
+                    </>
+                )
+            }
+
         </div>
     </>
 }
