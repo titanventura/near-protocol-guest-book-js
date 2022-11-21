@@ -98,12 +98,13 @@ function WordleTab({ wordleInterface }) {
         })
         const _allWordles = []
         const allWordlesResponse = await wordleInterface.allWordlesByUser()
-        console.log(allWordlesResponse, " fetched all wordles")
-        Object.entries(allWordlesResponse)
-            .forEach(([wordleId, gameInfo]) => {
-                _allWordles.push({ wordleId, gameInfo })
-            })
-        console.log(_allWordles, " all wordles")
+        if (allWordlesResponse != null && allWordlesResponse != undefined) {
+            Object.entries(allWordlesResponse)
+                .forEach(([wordleId, gameInfo]) => {
+                    _allWordles.push({ wordleId, gameInfo })
+                })
+        }
+
         setAllWordles(_allWordles)
         toast.dismiss()
     }

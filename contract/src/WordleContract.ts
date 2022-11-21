@@ -8,6 +8,10 @@ import {
 import { blockTimestamp } from "near-sdk-js/lib/api";
 import { Correctness, GameStatus } from "./model"
 
+
+export const ONE_NEAR = '1000000000000000000000000';
+export const TWO_NEAR = '2000000000000000000000000'
+
 type WordleID = string
 type UserID = string
 
@@ -30,37 +34,8 @@ type Game = {
 
 type Games = Record<WordleID, Game>
 
-
-enum ChallengeStatus {
-	PENDING = 0,
-	ACCEPTED = 1,
-	REJECTED = 2
-}
-
-type ChallengeSent = {
-	index: string
-	toIndex: string
-	to: UserID
-	stake: string
-	wordleId: WordleID
-	status: ChallengeStatus
-	createdAt: string
-}
-
-type ChallengeReceived = {
-	index: string
-	fromIndex: string
-	from: UserID
-	stake: string
-	wordleId: WordleID
-	status: ChallengeStatus
-	createdAt: string
-}
-
 type UserData = {
 	games: Games,
-	challenges_received: ChallengeReceived[],
-	challenges_sent: ChallengeSent[]
 }
 
 @NearBindgen({})
@@ -133,7 +108,7 @@ class WordleContract {
 		}
 	}
 
-	@view({})
+	@call({})
 	getGameById({ id }: { id: string }): Game {
 		let userid = near.predecessorAccountId()
 		if (!this.userData.hasOwnProperty(userid)) {
@@ -143,9 +118,12 @@ class WordleContract {
 		return user.games[id]
 	}
 
-	@view({})
+	@call({})
 	allWordlesByUser(): Games {
 		const user = near.predecessorAccountId()
+		if (!this.userData.hasOwnProperty(user)) {
+			return null
+		}
 		const games = this.userData[user].games
 		return games
 	}
@@ -157,13 +135,22 @@ class WordleContract {
 		game: Game | null,
 		success: boolean
 	} {
+
+		if (near.attachedDeposit() < BigInt(ONE_NEAR)) {
+			NearPromise.new(near.predecessorAccountId()).transfer(near.attachedDeposit()).onReturn()
+			return {
+				msg: "You should attach 1 NEAR to play",
+				wordle_id: null,
+				game: null,
+				success: false
+			}
+		}
+
 		let userID = near.predecessorAccountId()
 		// user signing in and requesting wordle for first time
 		if (!this.userData.hasOwnProperty(userID)) {
 			this.userData[userID] = {
 				games: {},
-				challenges_received: [],
-				challenges_sent: []
 			}
 		}
 
@@ -182,10 +169,8 @@ class WordleContract {
 			}
 		}
 
-		let challenges_received = this.userData[userID].challenges_received
 		let involvedWordleIDs = new Set([
-			...Object.keys(games),
-			...Object.keys(challenges_received)
+			...Object.keys(games)
 		])
 
 		if (involvedWordleIDs.size == Object.keys(this.wordles).length) {
@@ -213,128 +198,6 @@ class WordleContract {
 			msg: "new game created",
 			wordle_id: randomWordleID.toString(),
 			game,
-			success: true
-		}
-	}
-
-	@view({})
-	checkIfChallengeEligible({ wordle_id, user_id }: { wordle_id: string, user_id: string }): { eligibile: boolean } {
-		let userPlayedGames = this.userData[user_id].games
-		return {
-			eligibile: !Object.keys(userPlayedGames).includes(wordle_id)
-		}
-	}
-
-	@call({ payableFunction: true })
-	challengeUser({ wordle_id, user_id }: { wordle_id: string, user_id: string }): { msg: string, success: boolean } {
-
-		let selfId = near.predecessorAccountId()
-
-		if (!this.userData.hasOwnProperty(selfId)) {
-			return {
-				msg: "You should solve wordle to make a challenge",
-				success: false
-			}
-		}
-
-		let self = this.userData[selfId]
-
-		if (!Object.keys(self.games).includes(wordle_id)) {
-			return {
-				msg: "Only solved wordles are eligible to be raised for challenge",
-				success: false
-			}
-		}
-
-		if (self.challenges_sent.filter(chal => chal.wordleId == wordle_id && chal.to == user_id).length > 0) {
-			return {
-				msg: "Already challenged the user for same wordle",
-				success: false
-			}
-		}
-
-		if (!this.userData.hasOwnProperty(user_id)) {
-			this.userData[user_id] = {
-				games: {},
-				challenges_received: [],
-				challenges_sent: []
-			}
-		}
-
-		let receiver = this.userData[user_id]
-
-		const stake = near.attachedDeposit().toString()
-		const now = blockTimestamp().toString()
-		const challengeSent: ChallengeSent = {
-			stake,
-			to: user_id,
-			index: self.challenges_sent.length.toString(),
-			toIndex: receiver.challenges_received.length.toString(),
-			status: ChallengeStatus.PENDING,
-			wordleId: wordle_id,
-			createdAt: now
-		}
-		const challengeReceived: ChallengeReceived = {
-			stake,
-			fromIndex: challengeSent.index,
-			index: challengeSent.toIndex,
-			status: ChallengeStatus.PENDING,
-			from: selfId,
-			wordleId: wordle_id,
-			createdAt: now
-		}
-
-		self.challenges_sent.push(challengeSent)
-		receiver.challenges_received.push(challengeReceived)
-		return { msg: "Challenge created", success: true }
-	}
-
-	@view({})
-	challengesSent(): ChallengeSent[] {
-		let curUser = near.predecessorAccountId()
-		if (!this.userData.hasOwnProperty(curUser)) {
-			return []
-		}
-
-		return this.userData[curUser].challenges_sent
-	}
-
-	@view({})
-	challengesReceived(): ChallengeSent[] {
-		let curUser = near.predecessorAccountId()
-		if (!this.userData.hasOwnProperty(curUser)) {
-			return []
-		}
-
-		return this.userData[curUser].challenges_sent
-	}
-
-	@call({ payableFunction: true })
-	decideChallenge({ received_challenge_index, decision }: {
-		received_challenge_index: string,
-		decision: ChallengeStatus.ACCEPTED | ChallengeStatus.REJECTED
-	}): {
-		msg: string,
-		success: boolean
-	} {
-		let user = near.predecessorAccountId()
-		let self = this.userData[user]
-
-		let receivedChallenge = self.challenges_received[parseInt(received_challenge_index)]
-		let sentChallenge = this.userData[receivedChallenge.from].challenges_sent[parseInt(receivedChallenge.fromIndex)]
-		if (decision == ChallengeStatus.ACCEPTED) {
-			if (near.attachedDeposit() < BigInt(receivedChallenge.stake)) {
-				return {
-					msg: "Error. stake is less",
-					success: false
-				}
-			}
-		}
-
-		receivedChallenge.status = decision
-		sentChallenge.status = decision
-		return {
-			msg: "Challenge decision recorded",
 			success: true
 		}
 	}
@@ -393,31 +256,9 @@ class WordleContract {
 
 		if (gameAttempt.every(lc => lc.correctness == Correctness.CORRECT)) {
 			currentGame.status = GameStatus.WON
-
-
-			// TODO: see what to do with the challenge if any
-			let challengesReceived = this.userData[userID].challenges_received
-			let challengeExists = challengesReceived
-				.filter(chal => chal.wordleId == id && chal.status == ChallengeStatus.ACCEPTED)
-			if (challengeExists.length > 0) {
-				let stake = BigInt(challengeExists[0].stake)
-				stake += stake
-				NearPromise.new(userID).transfer(stake)
-			}
+			NearPromise.new(userID).transfer(BigInt(TWO_NEAR)).onReturn()
 		} else {
-			if (currentGame.attempts.length == 5) {
-				currentGame.status = GameStatus.LOST
-
-				// TODO: see what to do with the challenge if any
-				let challengesReceived = this.userData[userID].challenges_received
-				let challengeExists = challengesReceived
-					.filter(chal => chal.wordleId == id && chal.status == ChallengeStatus.ACCEPTED)
-				if (challengeExists.length > 0) {
-					let stake = BigInt(challengeExists[0].stake)
-					stake += stake
-					NearPromise.new(challengeExists[0].from).transfer(stake)
-				}
-			}
+			currentGame.status = GameStatus.LOST
 		}
 		currentGame.updatedAt = blockTimestamp().toString()
 

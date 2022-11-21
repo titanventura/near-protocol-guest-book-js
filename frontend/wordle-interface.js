@@ -24,6 +24,7 @@ export class WordleInterface {
         return await this.wallet.callMethod({
             contractId: this.contractId,
             method: "solveNewWordle",
+            deposit: utils.format.parseNearAmount("1")
         })
     }
 

@@ -6,6 +6,15 @@ function Tabs({ wordleInterface, wallet }) {
     const [curTab, setCurTab] = useState(0)
     const tabs = [
         {
+            "title": "About",
+            "component": () => {
+                return <>
+                    <h3>A wordle a day, gets a NEAR your way 😉</h3>
+                    <h6>Solve a wordle by depositing 1 NEAR. You get back 2 if you win !!</h6>
+                </>
+            }
+        },
+        {
             "title": "Wordles",
             "component": () => {
                 return (
@@ -15,10 +24,6 @@ function Tabs({ wordleInterface, wallet }) {
                 )
             }
         },
-        {
-            "title": "Challenges",
-            "component": () => <h1>Challenges</h1>
-        }
     ]
 
     return (
