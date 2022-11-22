@@ -5,7 +5,7 @@ export default function Form({ onSubmit, currentAccountId }) {
   return (
     <form onSubmit={onSubmit}>
       <fieldset id="fieldset">
-        <p>Sign the guest book, { currentAccountId }!</p>
+        <p>Sign the Worlde !, { currentAccountId }!</p>
         <p className="highlight">
           <label htmlFor="message">Message:</label>
           <input

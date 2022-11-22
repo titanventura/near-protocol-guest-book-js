@@ -257,7 +257,7 @@ class WordleContract {
 		if (gameAttempt.every(lc => lc.correctness == Correctness.CORRECT)) {
 			currentGame.status = GameStatus.WON
 			NearPromise.new(userID).transfer(BigInt(TWO_NEAR)).onReturn()
-		} else {
+		} else if (currentGame.attempts.length == 5) {
 			currentGame.status = GameStatus.LOST
 		}
 		currentGame.updatedAt = blockTimestamp().toString()

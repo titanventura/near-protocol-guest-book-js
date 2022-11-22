@@ -36,7 +36,7 @@ const App = ({ isSignedIn, guestBook, wallet }) => {
     <main>
       <table>
         <tr>
-          <td><h1>📖 NEAR Guest Book</h1></td>
+          <td><h1>📖 NEAR Worlde !</h1></td>
           <td>{ isSignedIn
           ? <button onClick={signOut}>Log out</button>
           : <button onClick={signIn}>Log in</button>
