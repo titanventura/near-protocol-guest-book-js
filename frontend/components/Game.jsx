@@ -37,7 +37,6 @@ export default function Game({ wordleId, gameInfo, submitGuess, clearGame }) {
     }
 
     const guessWordle = async () => {
-        console.log(`Submitting.. ${curWord}`)
         let regex = /^[A-Z]{5}$/
         let word = curWord.toUpperCase()
         if (!regex.test(word)) {

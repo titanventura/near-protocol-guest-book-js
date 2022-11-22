@@ -11,7 +11,6 @@ export class GuestBook {
 
   async getMessages() {
     const messages = await this.wallet.viewMethod({ contractId: this.contractId, method: "get_messages" })
-    console.log(messages)
     return messages
   }
 

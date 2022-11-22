@@ -54,9 +54,6 @@ class WordleContract {
 
 	@call({ privateFunction: true })
 	addWordle({ wordle }: { wordle: string }): { msg: string, success: boolean } {
-		// if (near.attachedDeposit() < POINT_ONE) {
-		// 	return { msg: "attach minimum 0.1", success: false }
-		// }
 
 		wordle = wordle.toUpperCase()
 		if (!this.validWordle(wordle)) {
@@ -128,6 +125,10 @@ class WordleContract {
 		return games
 	}
 
+	returnWhatWasDeposited() {
+		NearPromise.new(near.predecessorAccountId()).transfer(near.attachedDeposit()).onReturn()
+	}
+
 	@call({ payableFunction: true })
 	solveNewWordle(): {
 		msg: string,
@@ -137,7 +138,7 @@ class WordleContract {
 	} {
 
 		if (near.attachedDeposit() < BigInt(ONE_NEAR)) {
-			NearPromise.new(near.predecessorAccountId()).transfer(near.attachedDeposit()).onReturn()
+			this.returnWhatWasDeposited()
 			return {
 				msg: "You should attach 1 NEAR to play",
 				wordle_id: null,
@@ -147,7 +148,8 @@ class WordleContract {
 		}
 
 		let userID = near.predecessorAccountId()
-		// user signing in and requesting wordle for first time
+
+		// user request for first time
 		if (!this.userData.hasOwnProperty(userID)) {
 			this.userData[userID] = {
 				games: {},
@@ -160,6 +162,7 @@ class WordleContract {
 		let currentWordle = Object.entries(games).find(([wordleID, game]) => {
 			return game.status == GameStatus.IN_PROGRESS
 		})
+
 		if (currentWordle != undefined) {
 			return {
 				msg: "there is a wordle that is being solved",
@@ -169,11 +172,10 @@ class WordleContract {
 			}
 		}
 
-		let involvedWordleIDs = new Set([
-			...Object.keys(games)
-		])
+		let involvedWordleIDs = Object.keys(games)
 
-		if (involvedWordleIDs.size == Object.keys(this.wordles).length) {
+		if (involvedWordleIDs.length == Object.keys(this.wordles).length) {
+			this.returnWhatWasDeposited()
 			return {
 				msg: "unable to create game. all wordles solved",
 				wordle_id: null,

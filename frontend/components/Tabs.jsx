@@ -1,9 +1,8 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import WordleTab from './WordleTab'
 
 function Tabs({ wordleInterface, wallet }) {
 
-    const [curTab, setCurTab] = useState(0)
     const tabs = [
         {
             "title": "About",
@@ -25,6 +24,8 @@ function Tabs({ wordleInterface, wallet }) {
             }
         },
     ]
+
+    const [curTab, setCurTab] = useState(0)
 
     return (
         <>

@@ -24,11 +24,9 @@ function WordleTab({ wordleInterface }) {
         })
 
         const existingWordleResponse = await wordleInterface.existingWordle()
-        console.log(existingWordleResponse)
+
         if (existingWordleResponse.wordle_id === null) {
             const solveWordleResponse = await wordleInterface.solveNewWordle()
-
-            console.log(solveWordleResponse, " response")
 
             const {
                 msg,

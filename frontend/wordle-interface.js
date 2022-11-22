@@ -9,17 +9,6 @@ export class WordleInterface {
         this.wallet = walletToUse
     }
 
-    // async getMessages() {
-    //     const messages = await this.wallet.viewMethod({ contractId: this.contractId, method: "get_messages" })
-    //     console.log(messages)
-    //     return messages
-    // }
-
-    // async addMessage(message, donation) {
-    //     const deposit = utils.format.parseNearAmount(donation);
-    //     return await this.wallet.callMethod({ contractId: this.contractId, method: "add_message", args: { text: message }, deposit });
-    // }
-
     async solveNewWordle() {
         return await this.wallet.callMethod({
             contractId: this.contractId,
@@ -29,7 +18,6 @@ export class WordleInterface {
     }
 
     async submitGuess(wordle_id, guess) {
-        console.log(wordle_id, guess)
         return await this.wallet.callMethod({
             contractId: this.contractId,
             method: "wordleAttempt",
